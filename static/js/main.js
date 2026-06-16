@@ -11,6 +11,7 @@ const elements = {
     releaseGrid: document.getElementById('releaseGrid'),
     refreshBtn: document.getElementById('refreshBtn'),
     exportCsvBtn: document.getElementById('exportCsvBtn'),
+    themeToggleBtn: document.getElementById('themeToggleBtn'),
     searchInput: document.getElementById('searchInput'),
     filterBtns: document.querySelectorAll('.filter-btn'),
     // Stats
@@ -35,6 +36,7 @@ const elements = {
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
     fetchReleases(false);
     setupEventListeners();
 });
@@ -48,6 +50,9 @@ function setupEventListeners() {
 
     // Export CSV button
     elements.exportCsvBtn.addEventListener('click', exportToCsv);
+
+    // Theme toggle button
+    elements.themeToggleBtn.addEventListener('click', toggleTheme);
 
     // Search input
     elements.searchInput.addEventListener('input', (e) => {
@@ -86,8 +91,9 @@ function setupEventListeners() {
         const clickedCard = e.target.closest('.release-card');
         const clickedRefresh = elements.refreshBtn.contains(e.target);
         const clickedExport = elements.exportCsvBtn.contains(e.target);
+        const clickedTheme = elements.themeToggleBtn.contains(e.target);
         
-        if (!clickedInsideDrawer && !clickedCard && !clickedRefresh && !clickedExport && drawer.classList.contains('open')) {
+        if (!clickedInsideDrawer && !clickedCard && !clickedRefresh && !clickedExport && !clickedTheme && drawer.classList.contains('open')) {
             closeDrawer();
         }
     });
@@ -486,4 +492,40 @@ function exportToCsv() {
     document.body.removeChild(link);
     
     showToast("Exported to CSV!");
+}
+
+// Initialize light/dark theme preference
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    const sunIcon = elements.themeToggleBtn.querySelector('.sun-icon');
+    const moonIcon = elements.themeToggleBtn.querySelector('.moon-icon');
+    
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = 'block';
+    } else {
+        document.body.classList.remove('light-theme');
+        sunIcon.style.display = 'block';
+        moonIcon.style.display = 'none';
+    }
+}
+
+// Toggle light/dark theme preference and store in localStorage
+function toggleTheme() {
+    const isLight = document.body.classList.toggle('light-theme');
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    
+    const sunIcon = elements.themeToggleBtn.querySelector('.sun-icon');
+    const moonIcon = elements.themeToggleBtn.querySelector('.moon-icon');
+    
+    if (isLight) {
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = 'block';
+        showToast("Switched to Light Theme");
+    } else {
+        sunIcon.style.display = 'block';
+        moonIcon.style.display = 'none';
+        showToast("Switched to Dark Theme");
+    }
 }
