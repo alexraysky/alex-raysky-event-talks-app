@@ -10,6 +10,7 @@ let state = {
 const elements = {
     releaseGrid: document.getElementById('releaseGrid'),
     refreshBtn: document.getElementById('refreshBtn'),
+    exportCsvBtn: document.getElementById('exportCsvBtn'),
     searchInput: document.getElementById('searchInput'),
     filterBtns: document.querySelectorAll('.filter-btn'),
     // Stats
@@ -44,6 +45,9 @@ function setupEventListeners() {
     elements.refreshBtn.addEventListener('click', () => {
         fetchReleases(true);
     });
+
+    // Export CSV button
+    elements.exportCsvBtn.addEventListener('click', exportToCsv);
 
     // Search input
     elements.searchInput.addEventListener('input', (e) => {
@@ -81,8 +85,9 @@ function setupEventListeners() {
         const clickedInsideDrawer = drawer.contains(e.target);
         const clickedCard = e.target.closest('.release-card');
         const clickedRefresh = elements.refreshBtn.contains(e.target);
+        const clickedExport = elements.exportCsvBtn.contains(e.target);
         
-        if (!clickedInsideDrawer && !clickedCard && !clickedRefresh && drawer.classList.contains('open')) {
+        if (!clickedInsideDrawer && !clickedCard && !clickedRefresh && !clickedExport && drawer.classList.contains('open')) {
             closeDrawer();
         }
     });
@@ -215,12 +220,21 @@ function renderReleases() {
                     ${note.content}
                 </div>
                 <div class="card-footer">
-                    <button class="tweet-btn" onclick="handleDirectTweet(event, '${note.id}')">
-                        <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                        </svg>
-                        Tweet
-                    </button>
+                    <div class="footer-actions">
+                        <button class="tweet-btn" onclick="handleDirectTweet(event, '${note.id}')" title="Tweet about this update">
+                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                            </svg>
+                            Tweet
+                        </button>
+                        <button class="copy-card-btn" onclick="handleCopyCard(event, '${note.id}')" title="Copy update to clipboard">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
                     <div class="select-indicator"></div>
                 </div>
             </article>
@@ -239,8 +253,8 @@ function getNormalizedType(type) {
 
 // Handle clicking on the release card (select and open drawer)
 function handleCardClick(event, noteId) {
-    // If the click is inside a link or the share button, don't open the full drawer
-    if (event.target.tagName === 'A' || event.target.closest('a') || event.target.closest('.tweet-btn')) {
+    // If the click is inside a link or the buttons, don't open the full drawer
+    if (event.target.tagName === 'A' || event.target.closest('a') || event.target.closest('.tweet-btn') || event.target.closest('.copy-card-btn')) {
         return;
     }
     
@@ -382,4 +396,94 @@ function showToast(message) {
     setTimeout(() => {
         elements.toast.classList.remove('show');
     }, 2500);
+}
+
+// Copy update details to clipboard
+async function handleCopyCard(event, noteId) {
+    event.stopPropagation(); // Stop click from triggering card selection drawer open
+    const note = state.releases.find(r => r.id === noteId);
+    if (!note) return;
+    
+    const textToCopy = `📋 BigQuery Update (${note.date}) | ${note.type}:\n\n${note.summary}\n\nRead more: https://cloud.google.com/bigquery/docs/release-notes`;
+    
+    try {
+        await navigator.clipboard.writeText(textToCopy);
+        showToast("Copied to clipboard!");
+    } catch (err) {
+        console.error("Clipboard copy failed:", err);
+        // Fallback
+        const tempTextarea = document.createElement('textarea');
+        tempTextarea.value = textToCopy;
+        document.body.appendChild(tempTextarea);
+        tempTextarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempTextarea);
+        showToast("Copied to clipboard!");
+    }
+}
+
+// Get the current list of notes after applying active search and filters
+function getFilteredReleases() {
+    let filtered = state.releases;
+    
+    // Type Filter
+    if (state.currentFilter !== 'all') {
+        filtered = filtered.filter(r => {
+            const type = r.type.toLowerCase();
+            if (state.currentFilter === 'features') return type.includes('feature');
+            if (state.currentFilter === 'issues') return type.includes('issue');
+            if (state.currentFilter === 'deprecations') return type.includes('deprecation');
+            if (state.currentFilter === 'others') {
+                return !type.includes('feature') && !type.includes('issue') && !type.includes('deprecation');
+            }
+            return true;
+        });
+    }
+    
+    // Search Filter
+    if (state.searchQuery) {
+        filtered = filtered.filter(r => {
+            const content = r.content.toLowerCase();
+            const date = r.date.toLowerCase();
+            const type = r.type.toLowerCase();
+            return content.includes(state.searchQuery) || date.includes(state.searchQuery) || type.includes(state.searchQuery);
+        });
+    }
+    
+    return filtered;
+}
+
+// Export filtered releases to CSV
+function exportToCsv() {
+    const data = getFilteredReleases();
+    if (data.length === 0) {
+        showToast("No release notes to export!");
+        return;
+    }
+    
+    const headers = ["ID", "Date", "Type", "Summary"];
+    const rows = data.map(item => {
+        return [
+            item.id,
+            item.date,
+            item.type,
+            item.summary
+        ].map(val => `"${String(val).replace(/"/g, '""')}"`).join(",");
+    });
+    
+    const csvString = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    
+    const timestamp = new Date().toISOString().slice(0, 10);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `bigquery_release_notes_${timestamp}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast("Exported to CSV!");
 }

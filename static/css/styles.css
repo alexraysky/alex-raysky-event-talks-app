@@ -397,7 +397,13 @@ header {
   margin-top: auto;
 }
 
-.tweet-btn {
+.footer-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.tweet-btn, .copy-card-btn {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--text-secondary);
@@ -416,6 +422,12 @@ header {
   background: rgba(29, 155, 240, 0.1);
   border-color: #1d9bf0;
   color: #1d9bf0;
+}
+
+.copy-card-btn:hover {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: var(--color-feature);
+  color: var(--color-feature);
 }
 
 .select-indicator {
